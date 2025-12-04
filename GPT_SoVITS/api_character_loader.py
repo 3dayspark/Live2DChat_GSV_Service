@@ -22,8 +22,8 @@ class CharacterAttributes:
         self.gptsovits_ref_audio_text = ''
         self.gptsovits_ref_audio_lan = ''
         self.qt_css = None
-        self.rvc_model_path = ''  # RVCモデルパス
-        self.rvc_index_path = ''  # RVCインデックスパス
+        self.rvc_model_dir_id = ''  # RVCモデルパス
+        self.rvc_index_dir_id = ''  # RVCインデックスパス
 
     def log_attributes(self):
         """現在の属性値をログに出力する（デバッグ用）"""
@@ -125,20 +125,12 @@ class GetCharacterAttributes:
                     raise FileNotFoundError(f"キャラクター '{character.character_name}' の推論用リファレンスオーディオファイル(.wav/.mp3)が見つかりません。")
                 character.gptsovits_ref_audio = max(all_ref_audios, key=os.path.getmtime)
 
-                # RVCモデルとインデックスの読み込み (絶対パスを使用)
-                rvc_model_base_dir = os.path.join(char_audio_dir, "rvc_model")
+                # RVCモデルとインデックス
+                character.rvc_model_dir_id = os.path.join(character.character_folder_name, "rvc_model")
+                character.rvc_index_dir_id = os.path.join(character.character_folder_name, "rvc_model")
                 
-                rvc_pth_files = glob.glob(os.path.join(rvc_model_base_dir, "*.pth"))
-                if rvc_pth_files:
-                    character.rvc_model_path = max(rvc_pth_files, key=os.path.getmtime)
-                else:
-                    logger.warning(f"警告：キャラクター '{character.character_name}' のRVCモデルファイル(.pth)が見つかりません。")
-
-                rvc_index_files = glob.glob(os.path.join(rvc_model_base_dir, "*.index"))
-                if rvc_index_files:
-                    character.rvc_index_path = max(rvc_index_files, key=os.path.getmtime)
-                else:
-                    logger.warning(f"警告：キャラクター '{character.character_name}' のRVCインデックスファイル(.index)が見つかりません。")
+                logger.info(f"为角色 '{character.character_name}' 构造 RVC 模型目录 ID: {character.rvc_model_dir_id}")
+                logger.info(f"为角色 '{character.character_name}' 构造 RVC 索引目录 ID: {character.rvc_index_dir_id}")
 
                 # 参照テキストファイル
                 # 特定キャラクター('sakiko')以外の処理

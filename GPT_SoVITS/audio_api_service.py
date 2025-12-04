@@ -400,11 +400,11 @@ class SimpleAudioGenerator:
             raise ValueError(f"Invalid character index: {character_index}")
 
         current_char = self.character_list[character_index]
-        rvc_model_path = current_char.rvc_model_path
-        rvc_index_path = current_char.rvc_index_path
+        rvc_model_dir_id = current_char.rvc_model_dir_id
+        rvc_index_dir_id = current_char.rvc_index_dir_id
 
-        if not rvc_model_path or not rvc_index_path:
-            raise ValueError(f"RVC model or index paths not configured for character: {current_char.character_name}")
+        if not rvc_model_dir_id or not rvc_index_dir_id:
+            raise ValueError(f"RVC model or index directory ID not configured for character: {current_char.character_name}")
 
         # 2. Gemini TTS呼び出し
         if not self.GEMINI_API_KEY:
@@ -514,8 +514,8 @@ class SimpleAudioGenerator:
         # 3. RVCサービスによる音色変換
         rvc_payload = {
             "audio_data_base64": base64.b64encode(tts_wav_data).decode('utf-8'),
-            "rvc_model_path": rvc_model_path,
-            "rvc_index_path": rvc_index_path,
+            "rvc_model_relative_dir": rvc_model_dir_id, 
+            "rvc_index_relative_dir": rvc_index_dir_id, 
             "pitch_shift": 0,
             "f0_method": "rmvpe",
             "index_rate": 0.75,
@@ -554,18 +554,18 @@ class SimpleAudioGenerator:
             raise ValueError(f"Invalid character index: {character_index}")
 
         current_char = self.character_list[character_index]
-        rvc_model_path = current_char.rvc_model_path
-        rvc_index_path = current_char.rvc_index_path
+        rvc_model_dir_id = current_char.rvc_model_dir_id
+        rvc_index_dir_id = current_char.rvc_index_dir_id
 
-        if not rvc_model_path or not rvc_index_path:
-            raise ValueError(f"RVC model or index paths not configured for character: {current_char.character_name}")
+        if not rvc_model_dir_id or not rvc_index_dir_id:
+            raise ValueError(f"RVC model or index directory ID not configured for character: {current_char.character_name}")
 
         # 2. Edge TTS 音声生成
         edge_tts_voice = self.EDGE_TTS_DEFAULT_VOICE
 
         # カスタム音声設定の読み込み (azure_voice.txt)
-        rvc_model_dir = os.path.dirname(rvc_model_path)
-        azure_voice_config_path = os.path.join(rvc_model_dir, "azure_voice.txt")
+        character_audio_base_dir_in_chat_backend = os.path.dirname(current_char.gptsovits_ref_audio)
+        azure_voice_config_path = os.path.join(character_audio_base_dir_in_chat_backend, "azure_voice.txt")
         custom_voices = []
 
         if os.path.exists(azure_voice_config_path):
@@ -664,8 +664,8 @@ class SimpleAudioGenerator:
         # 3. RVCサービスによる音色変換
         rvc_payload = {
             "audio_data_base64": base64.b64encode(edge_tts_wav_data).decode('utf-8'),
-            "rvc_model_path": rvc_model_path,
-            "rvc_index_path": rvc_index_path,
+            "rvc_model_relative_dir": rvc_model_dir_id, 
+            "rvc_index_relative_dir": rvc_index_dir_id,
             "pitch_shift": 0,
             "f0_method": "rmvpe",
             "index_rate": 0.75,
@@ -704,11 +704,11 @@ class SimpleAudioGenerator:
             raise ValueError(f"Invalid character index: {character_index}")
 
         current_char = self.character_list[character_index]
-        rvc_model_path = current_char.rvc_model_path
-        rvc_index_path = current_char.rvc_index_path
+        rvc_model_dir_id = current_char.rvc_model_dir_id
+        rvc_index_dir_id = current_char.rvc_index_dir_id
 
-        if not rvc_model_path or not rvc_index_path:
-            raise ValueError(f"RVC model or index paths not configured for character: {current_char.character_name}")
+        if not rvc_model_dir_id or not rvc_index_dir_id:
+            raise ValueError(f"RVC model or index directory ID not configured for character: {current_char.character_name}")
 
         # 2. Azure TTS 音声生成
         if not self.AZURE_TTS_SUBSCRIPTION_KEY:
@@ -755,8 +755,8 @@ class SimpleAudioGenerator:
             azure_tts_voice_name = AZURE_TTS_DEFAULT_VOICE
 
             # カスタム音声設定の読み込み
-            rvc_model_dir = os.path.dirname(rvc_model_path)
-            azure_voice_config_path = os.path.join(rvc_model_dir, "azure_voice.txt")
+            character_audio_base_dir_in_chat_backend = os.path.dirname(current_char.gptsovits_ref_audio)
+            azure_voice_config_path = os.path.join(character_audio_base_dir_in_chat_backend, "azure_voice.txt")
             custom_voices = []
 
             if os.path.exists(azure_voice_config_path):
@@ -834,8 +834,8 @@ class SimpleAudioGenerator:
 
         rvc_payload = {
             "audio_data_base64": base64_azure_tts_audio,
-            "rvc_model_path": rvc_model_path,
-            "rvc_index_path": rvc_index_path,
+            "rvc_model_relative_dir": rvc_model_dir_id, 
+            "rvc_index_relative_dir": rvc_index_dir_id,
             "f0_up_key": 0,
             "f0_method": "rmvpe",
             "protect": 0.5,
@@ -846,7 +846,7 @@ class SimpleAudioGenerator:
         }
         rvc_headers = {"Content-Type": "application/json"}
 
-        logger.debug(f"Sending RVC request for character {current_char.character_name}. Model: {rvc_model_path}")
+        logger.debug(f"Sending RVC request for character {current_char.character_name}.")
 
         try:
             rvc_response = requests.post(RVC_SERVICE_URL, headers=rvc_headers, json=rvc_payload, timeout=60)
