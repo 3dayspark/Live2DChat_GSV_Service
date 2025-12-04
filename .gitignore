@@ -1,0 +1,76 @@
+# Python ランタイム環境
+/runtime/
+
+# Python コンパイル済みファイル
+__pycache__/
+*.pyc
+*.pyd
+
+# 機密ファイル (APIキーなど)
+API Key.txt
+API Key_Azure.txt
+api_keys.json
+
+# GPT_SoVITS サブモジュール固有の生成ファイルとモデル
+# 注意：これらのパスは Chat_backend/ ディレクトリからの相対パスです
+/GPT_SoVITS/__pycache__/
+/GPT_SoVITS/*.pyc
+/GPT_SoVITS/*.pyd
+/GPT_SoVITS/ffmpeg.exe
+/GPT_SoVITS/training_dir/
+/GPT_SoVITS/pretrained_models/
+/GPT_SoVITS/logs/
+/GPT_SoVITS/TEMP/
+/GPT_SoVITS/text/
+# 一時的なテストスクリプト (任意、これらのファイルがコアコードに含まれない場合)
+/GPT_SoVITS/test_3.py
+/GPT_SoVITS/57.py
+/GPT_SoVITS/audio_shiyan.py
+/GPT_SoVITS/eres2net/
+/GPT_SoVITS/tools/
+/GPT_SoVITS/config.py
+/GPT_SoVITS/inference_cli.py
+/GPT_SoVITS/inference_cli_v2_pro.py
+/GPT_SoVITS/emotion_detect.py
+/GPT_SoVITS/inference_emotion_detect.py
+/GPT_SoVITS/inference_webui.py
+/GPT_SoVITS/AR/models/t2s_model.py
+/GPT_SoVITS/f5_tts/model/backbones/dit.py
+/GPT_SoVITS/f5_tts/model/__init__.py
+/GPT_SoVITS/module/models.py
+
+# live2d_related/ 内のすべてのファイルを無視 (生成ファイルやユーザー生成データが含まれる場合)
+/live2d_related/
+
+# reference_audio/ 内のすべてのファイルを無視 (大きなファイルやユーザー生成データが含まれる場合)
+/reference_audio/
+
+# IDE およびエディタの設定
+.vscode/
+.idea/
+*.suo
+*.user
+.DS_Store
+Thumbs.db
+
+# ログファイル
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 一時ファイルとデータベース
+*.tmp
+*.temp
+*.sqlite3
+*.db
+
+# バックアップファイル
+*.bak
+*.orig
+*.swp
+*~
+/font/
+/if_delete_audio_cache.txt
+/is_fp32.txt
