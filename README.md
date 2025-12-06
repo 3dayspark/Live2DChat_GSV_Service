@@ -8,9 +8,9 @@
 
 *   Backend (Main): 本リポジトリ (LLM & GPT-SoVITS)
     *   役割: LLMとの対話生成、感情分析、GPT-SoVITSによる音声合成、全体オーケストレーション
-*   [Frontend: Live2D & Vue.js](https://gitee.com/thdayspk/Live2DChat_Vue/tree/main)
+*   [Frontend: Live2D & Vue.js](https://gitee.com/thdayspk/Live2DChat_Vue)
     *   役割: Live2Dモデルの描画、チャットUI、リップシンク制御
-*   [Microservice: RVC Service](https://gitee.com/thdayspk/Live2DChat_RVC_Service/tree/main)
+*   [Microservice: RVC Service](https://gitee.com/thdayspk/Live2DChat_RVC_Service)
     *   役割: 外部TTS音声の声質変換 (RVC) を行う独立したマイクロサービス
 
 
