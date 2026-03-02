@@ -124,7 +124,7 @@ To accommodate future scalability and concurrent processing, the entire system h
     *   Role: Monitors the Redis queue and asynchronously executes heavy audio synthesis tasks (GPU-bound).
 2.  [Backend - API Gateway](https://github.com/3dayspark/Live2DChat_API_Gateway)
     *   Role: A CPU-bound API server handling client requests, LLM interactions, pushing tasks to Redis, and calling external TTS APIs.
-3.[Frontend - Live2D & Vue.js](https://github.com/3dayspark/Live2DChat_Vue)
+3.  [Frontend - Live2D & Vue.js](https://github.com/3dayspark/Live2DChat_Vue)
     *   Role: Rendering Live2D models, Chat UI, and Real-time Lip-sync control.
 4.  [Microservice - RVC Service](https://github.com/3dayspark/Live2DChat_RVC_Service)
     *   Role: An independent GPU microservice for Real-time Voice Conversion (RVC).
