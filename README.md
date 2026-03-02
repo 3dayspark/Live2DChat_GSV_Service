@@ -4,279 +4,187 @@
 
 <span id="jp"></span>
 
-# AI/Live2D Character Chat Application
+# AI/Live2D Character Chat - GPT-SoVITS Worker (System Main Docs)
 
 ## プロジェクト構成について (Project Structure)
 
-本リポジトリは、「AI/Live2D キャラクターチャットアプリケーション」**における**メインバックエンド（LLM制御・GPT-SoVITS音声合成）を担当するプロジェクトです。
+本リポジトリは、「AI/Live2D キャラクターチャットアプリケーション」における **GPT-SoVITS音声合成（GPUワーカー）** を担当するプロジェクトであり、 **システム全体のメインドキュメント** を兼ねています。
 
-システム全体は以下の3つのリポジトリで構成されています：
+今後の負荷増や並行処理を見据え、システム全体は役割ごとに **4つのマイクロサービス（独立したリポジトリ）** へ分割・解耦（Decoupling）されています：
 
-*   **Backend (Main): 本リポジトリ (LLM & GPT-SoVITS)**
-    *   役割: LLMとの対話生成、感情分析、GPT-SoVITSによる音声合成、全体オーケストレーション
-*   [Frontend: Live2D & Vue.js](https://github.com/3dayspark/Live2DChat_Vue)
-    *   役割: Live2Dモデルの描画、チャットUI、リップシンク制御
-*   [Microservice: RVC Service](https://github.com/3dayspark/Live2DChat_RVC_Service)
-    *   役割: 外部TTS音声の声質変換 (RVC) を行う独立したマイクロサービス
+1.  **Backend - GSV Service: 本リポジトリ (Main Docs & GPT-SoVITS Inference)**
+    *   役割: Redisキューを監視し、GPUリソースを消費する重い音声合成タスク（GPT-SoVITS）を非同期で実行。
+2.  [Backend - API Gateway](https://github.com/3dayspark/Live2DChat_API_Gateway)
+    *   役割: クライアントリクエストの受付、LLM連携、タスクのRedisへのプッシュ、外部TTSの呼び出し等を担うCPUバウンドなAPIサーバー。
+3.  [Frontend - Live2D & Vue.js](https://github.com/3dayspark/Live2DChat_Vue)
+    *   役割: Live2Dモデルの描画、チャットUI、リアルタイム・リップシンク制御。
+4.  [Microservice - RVC Service](https://github.com/3dayspark/Live2DChat_RVC_Service)
+    *   役割: 外部TTS音声の声質変換 (RVC) を行う独立したGPUマイクロサービス。
 
 ## 概要 (Overview)
-LLM（大規模言語モデル）とLive2D、そして最新の音声合成技術（GPT-SoVITS, RVC）を統合した、リアルタイム・ウェブ対話アプリケーションです。
-
-単なるチャットボットではなく、「感情表現」と「音声の即時性」に焦点を当て、ユーザー入力に対するテキスト生成、感情分析、音声合成、そしてLive2Dモデルの表情・口パク（リップシンク）同期を低遅延で実現しています。
-
-## デモ機能 (Key Features)
-
-*   **マルチモーダルな対話体験:** テキスト、音声、視覚（Live2Dモーション）が同期した没入感のある体験を提供。
-*   **高度な音声合成パイプライン:**
-    *   **GPT-SoVITS:** 少量のデータで高品質なキャラクター学習・推論。
-    *   **RVC (Retrieval-based Voice Conversion):** 外部TTS（Azure, Gemini, EdgeTTS）の出力音声をキャラクターの声質へリアルタイム変換。
-*   **感情認識と表現:** 入力/出力テキストから感情（喜び、怒り、悲しみ等）を推論し、Live2Dモデルの表情とモーションを自動制御。
-*   **デュアルキャラクターモード:** 2体のAIキャラクター同士が会話する様子を観察できる自律対話モードを実装。
-*   **レスポンシブUI:** PCおよびモバイル端末（タッチ操作）に最適化されたVue.jsフロントエンド。
-
-## 技術スタック (Tech Stack)
-
-### Backend (Python / FastAPI)
-*   **Framework:** FastAPI (Asynchronous I/O)
-*   **LLM Integration:** Gemini API, ModelScope (OpenAI Compatible)
-*   **Audio Synthesis:** GPT-SoVITS, RVC (Retrieval-based Voice Conversion), EdgeTTS, AzureTTS
-*   **ML/NLP:** PyTorch, Transformers (BERT/Hubert based Emotion Detection)
-*   **Architecture:** Microservices approach (Main API + Isolated RVC Service)
-
-### Frontend (TypeScript / Vue 3)
-*   **Framework:** Vue 3 (Composition API), Vite
-*   **Rendering:** PixiJS, pixi-live2d-display (Live2D Cubism SDK integration)
-*   **Audio:** Web Audio API (Real-time frequency analysis for lip-sync)
+LLM（大規模言語モデル）とLive2D、そして最新の音声合成技術（GPT-SoVITS, RVC）を統合した、リアルタイム・ウェブ対話アプリケーションです。単なるチャットボットではなく、「感情表現」と「音声の多様な合成方式」に焦点を当てています。
 
 ## システムアーキテクチャ (System Architecture)
 
-本プロジェクトは、スケーラビリティと応答速度を確保するために、推論処理を適切に分離した設計を採用しています。
+現在のシステムは、将来的なクラウド環境（AWS等）での **独立したスケーリング（Independent Scaling）** を可能にするアーキテクチャを採用しています。
 
-<img src="./assets/architecture.png" alt="Architecture Diagram" width="800">
+<img src="./assets/architecture.png" alt="System Architecture Diagram" width="800">
 
-## 技術的なこだわり (Technical Highlights)
+*   **独立拡張性:** 軽量なHTTPリクエストを処理する「API Gateway（CPU）」と、重い推論を行う「GSV Worker（GPU）」を分離したことで、トラフィック増加時にはAPI Gatewayのみをスケールアウトし、音声合成キューが溜まった時のみGSV Workerをスケールアウトさせることが可能です。
 
-### 1. 推論プロセスの非同期化と排他制御 (Backend)
-GPT-SoVITSなどの重い推論処理がWebサーバーのイベントループをブロックしないよう、`multiprocessing` モジュールを使用した独自のプロセスマネージャー (`GPTSovitsProcessManager`) を実装しました。
-*   **Multiprocessing & Queues:** 推論を別プロセスで実行し、キューを通じてデータをやり取りすることで、APIの応答性を維持。
-*   **Locking Mechanism:** 複数のリクエストが同時に来た際のモデル切り替えや推論の競合を防ぐため、スレッドロックによる排他制御を実装。
+### データフローと連携メカニズム
+1.  **Redisを介したGatewayとGSV Workerの制御:**
+    *   API GatewayはLLMからテキストを受け取ると、タスクIDを発行し、タスクペイロードをRedisのリスト（`queue:audio:global`）に `rpush` します。
+    *   GSV Workerは常時 `brpop` でキューを監視しており、タスクを取得して音声合成を実行後、結果（Base64音声データ）をRedisのKey-Valueとして `set` し、Gatewayがそれを取得してフロントエンドへ返します。
+2.  **外部TTSとRVCサービスの連携:**
+    *   「TTS+RVCモード」が選択された場合、Gatewayはまず外部API（Gemini/Edge/Azure）にテキストを送信して汎用音声を取得します。
+    *   その後、Gatewayはその音声データをBase64エンコードし、独立した `RVC Service` へHTTP POSTリクエストを送信。キャラクターの声に声質変換された音声を受け取ります。
 
-### 2. ハイブリッド音声合成パイプライン (Backend)
-シナリオに応じて最適な音声合成方式を選択できる柔軟な設計にしました。
-*   **GPT-SoVITS:** 感情表現が重要な場面で使用。
-*   **TTS + RVC:** 長文や高速な応答が必要な場面で、EdgeTTSやAzureTTSで生成した音声をRVCでキャラクターの声に変換し、低遅延と品質を両立。
+## 主要機能 (Key Features)
 
-### 3. フロントエンドでのリアルタイム・リップシンク (Frontend)
-サーバーサイドでリップシンクデータを生成するのではなく、フロントエンドの `Web Audio API` (`AnalyserNode`) を使用して音声の周波数データをリアルタイム解析。
-*   音量レベルに応じてLive2Dの `PARAM_MOUTH_OPEN_Y` パラメータを動的に制御し、自然な口の動きを実現。これによりサーバー負荷と通信量を削減しました。
+*   **柔軟なマルチLLM推論モデル:**
+    *   Gemini API、またはModelScope (Qwen等) などの複数のLLMをワンクリックで切り替えて対話生成が可能。
+*   **マルチ音声合成パイプライン (Multi-TTS Pipeline):** シナリオに応じて以下の音声合成方式を切り替え可能です。
+    *   **GPT-SoVITS:** 少量のデータで高品質・高感情なキャラクター音声合成。
+    *   **外部TTS + RVC:** Gemini TTS / EdgeTTS / Azure TTSで生成した音声を、RVCサービス経由でキャラクターの声質へリアルタイム変換。長文や高速な応答が必要な場面に最適化。
+*   **シングル / デュアルキャラクターモード:**
+    *   ユーザーと1対1で会話する通常のモードに加え、2体のAIキャラクター同士が会話する様子を観察できる「デュアルキャラクターモード」を搭載。
+*   **フロントエンドでのリアルタイム・リップシンク:**
+    *   サーバーサイドでリップシンクデータを事前計算するのではなく、フロントエンドの `Web Audio API` (`AnalyserNode`) を使用して音声の周波数データをリアルタイム解析。音量に応じてLive2Dの口の開閉を動的に制御することで、サーバー負荷を大幅に削減しています。
 
-### 4. 感情駆動のモーション制御
-BERTベースの感情分析モデル (`emotion_detect.py`) により、テキストから7種類の感情（happiness, sadness, anger, etc.）を分類。フロントエンド側で感情ラベルを受け取り、Live2Dの適切なモーション・表情ファイルへマッピングして再生します。
+## 技術スタック (Tech Stack)
 
-## ディレクトリ構成 (Directory Structure)
+### Backend (GSV Service & API Gateway)
+*   **Framework:** FastAPI (Asynchronous I/O)
+*   **Message Broker:** Redis (Queue management & Pub/Sub for decoupling)
+*   **LLM Integration:** Gemini API, ModelScope (Qwen)
+*   **Audio Synthesis:** GPT-SoVITS (PyTorch)
+*   **Process Management:** Python `multiprocessing` (with threading Locks for GPU memory safety)
 
-```text
-.
-├── Live2DChat_GSV_LLM_Service/
-│   └── GPT_SoVITS/             # Main Backend Source Code
-│       ├── fastapi_main.py     # Entry point, API Routes
-│       ├── audio_api_service.py # Audio synthesis logic router
-│       ├── text_api_service.py # LLM integration logic
-│       ├── gptsovits_process_manager.py # Multiprocessing manager for inference
-│       ├── api_character_loader.py # Character configuration loader
-│       ├── emotion_detect.py   # Emotion classification model
-│       ├── inference_webui.py  # GPT-SoVITS inference logic
-│       └── ...                 # Other configs and models
-├── Live2DChat_Vue/        # Vue.js Frontend
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── ChatInterface.vue # Chat UI & Logic
-│   │   │   └── Live2DCanvas.vue  # Live2D rendering & Motion control
-│   │   └── api/                  # Axios API wrappers
-│   └── ...
-└── Live2DChat_RVC_Service/          # RVC Microservice
-    └── rvc_api_service.py      # Independent API for RVC Voice Conversion
-```
+### Frontend (Vue.js) & Microservice (RVC)
+*   **Frontend:** Vue 3 (Composition API), Vite, TypeScript, PixiJS, Live2D Cubism SDK
+*   **Frontend Audio:** Web Audio API (Real-time volume analysis)
+*   **RVC Microservice:** FastAPI, Retrieval-based Voice Conversion (RVC), PyTorch
 
-## 今後の展望: 大規模並行処理に向けたアーキテクチャの進化 (Future Roadmap: Scaling Architecture)
+## 最新のアップデート履歴 (Recent Update Log)
 
-現在の `multiprocessing` ベースの設計は単一ノードでの効率性を重視していますが、将来的なリクエスト増大に対応するため、以下の段階的なクラウドネイティブ移行を計画しています。
+旧バージョン（モノリス設計）で掲げていた展望に基づき、以下の大幅なアーキテクチャ刷新を行いました。
 
-### 1. サービスの完全な疎結合化 (Service Decoupling)
-*   **現状:** テキスト処理（Gateway）と音声推論（Worker）が同一Pod内で稼働。
-*   **計画:** これらを独立したマイクロサービスとして分離します。
-    *   **Gateway Service (CPU-bound):** 軽量なHTTPリクエスト処理とLLM通信を担当。CPU負荷に応じて安価に水平スケール可能にします。
-    *   **Inference Service (GPU-bound):** GPT-SoVITSなどの重い処理を担当。GPUリソースに特化して管理します。
+*   **サービスの完全な疎結合化 (Service Decoupling):**
+    *   API GatewayとGSV Workerを別リポジトリ・別プロセスに分割しました。
+*   **Redisメッセージキューの導入:**
+    *   高負荷時のトラフィック制御のためにRedisを導入。これにより、将来的にリソースが許すタイミングで「キャラクターごとに専用のWorkerを割り当て、モデルの切り替えコストをゼロにする（Zero Cold Start）」という大規模構成への移行準備が整いました。
+*   **感情分析ロジックの最適化:**
+    *   以前はローカルに重い感情分析モデル（BERT等）を配置していましたが、これを撤廃し、LLMのプロンプトエンジニアリングによって出力テキスト内に `[emotion:happiness]` のようなタグを含めさせる方式に変更しました。これにより、推論の質を落とすことなくデプロイ時の複雑さとリソース消費を大幅に削減しました。
 
-### 2. Redisによる非同期メッセージキューの導入 (Redis Message Queue)
-*   **現状:** Python標準の `multiprocessing.Queue` を使用（単一サーバー内での通信）。
-*   **計画:** プロセス間通信を **Redis** を介した非同期メッセージングに置き換えます。これにより、複数の推論ノード間での負荷分散が可能になり、障害時の再試行（Retries）や永続化も容易になります。
+## 環境構築と実行方法 (Setup Instructions for GSV Worker)
 
-### 3. Kubernetesでのモデル常駐化と「冷間始動」の解決 (Zero Cold Start Strategy)
-単純なロードバランシングでは、リクエストごとに異なるキャラクターモデルのロード/アンロードが発生し、レスポンスが遅延する課題があります。これを解決するために以下を導入します。
-*   **キャラクター別専用キュー (Character-Specific Queues):**
-    *   GatewayはキャラクターIDに基づき、`queue:sakiko`, `queue:anon` といった特定のRedisリストへタスクを振り分けます。
-*   **Workerの専任化:**
-    *   特定のWorker Podは特定のキューのみを監視（Subscribe）し、モデルをメモリに常駐させます。これにより、**モデル切り替えコストをゼロ**にし、即応性を最大化します。
+GSV Workerプロジェクトをローカルでセットアップするための基本手順です。
 
-### 4. FinOps視点でのコスト最適化 (Cost Optimization)
-*   **Spot Instanceの活用:** 
-    *   常時稼働させるベースラインのノードにはオンデマンドインスタンスを使用し、バースト的なトラフィックに対しては、安価な **Spot Instances**（AWS/GCP）で自動スケール（KEDA利用）する構成へ移行します。
-*   **GPU Sharing:**
-    *   NVIDIA Time-Slicing等を活用し、単一のGPUノード内で複数の推論Podを稼働させることで、ハードウェアリソースの利用効率を最大化します。
+1. **PyTorchのインストール:**
+   ご自身のCUDA環境（例: cu118）とPythonバージョンに合わせたPyTorchを手動でインストールします。
+   ```bash
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+   ```
+2. **依存パッケージのインストール:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. **OpenJTalk辞書の配置（エラー回避用）:**
+   GSVの初回実行時、日本語合成用の `open_jtalk` 辞書の自動ダウンロードが失敗してエラーになる場合があります。その場合は以下を手動で行ってください。
+   *[open_jtalk_dic_utf_8-1.11.tar.gz](https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/open_jtalk_dic_utf_8-1.11.tar.gz) をダウンロードして解圧。
+   * 解圧したフォルダ内のデータを、プロジェクトの仮想環境内の以下のパスに配置してください：
+     `仮想環境ルート\Lib\site-packages\pyopenjtalk\open_jtalk_dic_utf_8-1.11\`
 
-## セットアップと実行に関する注意 (Note on Setup & Execution)
+## セットアップに関する注意 (Note on Setup & Execution)
 
 本リポジトリはポートフォリオとして公開しており、ソースコードの閲覧を主目的としています。
-以下の理由により、`git clone` 直後の動作は保証しておりません。
-
-1.  **著作権保護:** 商用または著作権のあるLive2Dモデルデータ、および特定の音声素材はリポジトリに含まれていません。
-2.  **ファイルサイズ制限:** GPT-SoVITSやRVCの学習済みモデル（重みファイル）などの大容量バイナリファイルは `.gitignore` により除外されています。
-
+商用または著作権のあるLive2Dモデルデータ、大容量の学習済み重みファイルなどは `.gitignore` により除外されています。
 
 ### 必要なファイル構成 (Missing Files Structure)
-ローカルで実行する場合、以下を含む（ただしこれらに限定されない）適切なモデルファイルや素材を配置する必要があります：
+ローカルで完全に実行する場合、リポジトリ内に以下のファイルやディレクトリ（一例）を適切に配置する必要があります：
 
-*   `Chat_backend/GPT_SoVITS/pretrained_models/` ... GPT-SoVITSモデル
-*   `Chat_backend/reference_audio/` ... 参照音声ファイル
-*   `pixi-live2d-display/public/models/` ... Live2Dモデルデータ
+*   `./GPT_SoVITS/pretrained_models/` ... GPT-SoVITSの事前学習済みベースモデル
+*   `./reference_audio/` ... 各キャラクターの推論用参照音声およびモデルデータ
+*   `./public/models/` ... フロントエンド側のLive2Dモデルデータ
 
 ---
 
 <span id="en"></span>
 
-# AI/Live2D Character Chat Application
+# AI/Live2D Character Chat - GPT-SoVITS Worker (System Main Docs)
 
 ## Project Structure
 
-This repository is the **Main Backend (LLM Control & GPT-SoVITS Audio Synthesis)** for the "AI/Live2D Character Chat Application".
+This repository is the **GPT-SoVITS Worker (GPU Inference)** for the "AI/Live2D Character Chat Application" and serves as the **System's Main Documentation**.
 
-The entire system consists of the following three repositories:
+To accommodate future scalability and concurrent processing, the entire system has been decoupled into **4 independent microservices**:
 
-*   **Backend (Main): This Repository (LLM & GPT-SoVITS)**
-    *   Role: Dialogue generation with LLM, Emotion analysis, Audio synthesis via GPT-SoVITS, and Overall orchestration.
-*   [Frontend: Live2D & Vue.js](https://github.com/3dayspark/Live2DChat_Vue)
-    *   Role: Rendering Live2D models, Chat UI, and Lip-sync control.
-*   [Microservice: RVC Service](https://github.com/3dayspark/Live2DChat_RVC_Service)
-    *   Role: An independent microservice for Real-time Voice Conversion (RVC) using external TTS audio.
+1.  **Backend - GSV Service: This Repository (Main Docs & GPT-SoVITS Inference)**
+    *   Role: Monitors the Redis queue and asynchronously executes heavy audio synthesis tasks (GPU-bound).
+2.  [Backend - API Gateway](https://github.com/3dayspark/Live2DChat_API_Gateway)
+    *   Role: A CPU-bound API server handling client requests, LLM interactions, pushing tasks to Redis, and calling external TTS APIs.
+3.[Frontend - Live2D & Vue.js](https://github.com/3dayspark/Live2DChat_Vue)
+    *   Role: Rendering Live2D models, Chat UI, and Real-time Lip-sync control.
+4.  [Microservice - RVC Service](https://github.com/3dayspark/Live2DChat_RVC_Service)
+    *   Role: An independent GPU microservice for Real-time Voice Conversion (RVC).
 
 ## Overview
-A real-time web dialogue application integrating Large Language Models (LLM), Live2D, and state-of-the-art speech synthesis technologies (GPT-SoVITS, RVC).
-
-More than just a chatbot, this project focuses on **"Emotional Expression"** and **"Audio Immediacy."** It realizes low-latency text generation, emotion analysis, speech synthesis, and synchronized Live2D facial expressions/lip-syncing in response to user input.
-
-## Key Features
-
-*   **Multimodal Dialogue Experience:** Provides an immersive experience where Text, Audio, and Visuals (Live2D motion) are synchronized.
-*   **Advanced Audio Synthesis Pipeline:**
-    *   **GPT-SoVITS:** High-quality character training and inference with small datasets.
-    *   **RVC (Retrieval-based Voice Conversion):** Real-time conversion of output audio from external TTS (Azure, Gemini, EdgeTTS) into the target character's voice.
-*   **Emotion Recognition & Expression:** Infers emotions (Joy, Anger, Sorrow, etc.) from input/output text to automatically control Live2D facial expressions and motions.
-*   **Dual Character Mode:** Implements an autonomous dialogue mode where users can observe two AI characters talking to each other.
-*   **Responsive UI:** A Vue.js frontend optimized for both PC and mobile devices (touch operations).
-
-## Tech Stack
-
-### Backend (Python / FastAPI)
-*   **Framework:** FastAPI (Asynchronous I/O)
-*   **LLM Integration:** Gemini API, ModelScope (OpenAI Compatible)
-*   **Audio Synthesis:** GPT-SoVITS, RVC (Retrieval-based Voice Conversion), EdgeTTS, AzureTTS
-*   **ML/NLP:** PyTorch, Transformers (BERT/Hubert based Emotion Detection)
-*   **Architecture:** Microservices approach (Main API + Isolated RVC Service)
-
-### Frontend (TypeScript / Vue 3)
-*   **Framework:** Vue 3 (Composition API), Vite
-*   **Rendering:** PixiJS, pixi-live2d-display (Live2D Cubism SDK integration)
-*   **Audio:** Web Audio API (Real-time frequency analysis for lip-sync)
+A real-time web dialogue application integrating Large Language Models (LLM), Live2D, and advanced speech synthesis technologies (GPT-SoVITS, RVC). It focuses heavily on "Emotional Expression" and "Diverse Audio Synthesis Methods."
 
 ## System Architecture
 
-This project adopts a decoupled design to ensure scalability and response speed.
+The current architecture is designed to enable **Independent Scaling** in cloud environments (like AWS).
 
-<img src="./assets/architecture.png" alt="Architecture Diagram" width="800">
+<img src="./assets/architecture.png" alt="System Architecture Diagram" width="800">
 
-## Technical Highlights
+*   **Independent Scalability:** By decoupling the lightweight "API Gateway (CPU)" from the heavy "GSV Worker (GPU)", the system can scale the API Gateway horizontally during high web traffic, and scale the GSV Worker only when the audio generation queue builds up.
 
-### 1. Asynchronous Inference & Exclusive Control (Backend)
-To prevent heavy inference processes like GPT-SoVITS from blocking the web server's event loop, I implemented a custom process manager (`GPTSovitsProcessManager`) using the `multiprocessing` module.
-*   **Multiprocessing & Queues:** Maintains API responsiveness by executing inference in separate processes and exchanging data via queues.
-*   **Locking Mechanism:** Implements exclusive control using thread locks to prevent model switching conflicts or inference race conditions when multiple requests arrive simultaneously.
+### Data Flow & Control Mechanisms
+1.  **Gateway & GSV Worker via Redis:**
+    *   Upon receiving text from the LLM, the API Gateway generates a Task ID and pushes (`rpush`) the payload to a Redis list (`queue:audio:global`).
+    *   The GSV Worker constantly polls (`brpop`) the queue. After synthesizing the audio, it sets (`set`) the Base64 audio result back to Redis, which the Gateway retrieves and returns to the frontend.
+2.  **External TTS & RVC Integration:**
+    *   If the "TTS+RVC Mode" is selected, the Gateway calls an external API (Gemini/Edge/Azure) to get generic speech audio.
+    *   The Gateway then sends this audio via an HTTP POST request to the isolated `RVC Service`, which converts and returns the target character's voice.
 
-### 2. Hybrid Audio Synthesis Pipeline (Backend)
-Designed flexibly to select the optimal speech synthesis method depending on the scenario.
-*   **GPT-SoVITS:** Used when emotional expression is critical.
-*   **TTS + RVC:** Used for long texts or when high-speed response is required. It converts audio generated by EdgeTTS or AzureTTS into the character's voice using RVC, balancing low latency and quality.
+## Key Features
 
-### 3. Real-time Frontend Lip-sync (Frontend)
-Instead of generating lip-sync data on the server side, the frontend uses the `Web Audio API` (`AnalyserNode`) to analyze audio frequency data in real-time.
-*   Dynamically controls the Live2D `PARAM_MOUTH_OPEN_Y` parameter based on volume levels to achieve natural mouth movements. This reduces server load and data traffic.
+*   **Multi-LLM Support:** Easily switch between different inference models such as Gemini API and ModelScope (e.g., Qwen).
+*   **Multi-TTS Pipeline:** 
+    *   **GPT-SoVITS:** High-quality, emotional character voice synthesis.
+    *   **External TTS + RVC:** Real-time voice conversion mapping outputs from Gemini/Edge/Azure TTS into the character's voice via the RVC service.
+*   **Single / Dual Character Modes:** Switch between a standard 1-on-1 chat and an autonomous "Dual Character Mode" where two AI characters converse with each other.
+*   **Real-time Frontend Lip-sync:** 
+    *   The frontend uses the `Web Audio API` (`AnalyserNode`) to analyze audio frequencies in real-time, dynamically adjusting the Live2D mouth parameters. This drastically reduces server computation load.
 
-### 4. Emotion-Driven Motion Control
-A BERT-based emotion analysis model (`emotion_detect.py`) classifies text into 7 types of emotions (happiness, sadness, anger, etc.). The frontend receives the emotion label and maps it to the appropriate Live2D motion/expression files for playback.
+## Tech Stack
 
-## Directory Structure
+### Backend (GSV Service & API Gateway)
+*   **Framework:** FastAPI (Asynchronous I/O)
+*   **Message Broker:** Redis
+*   **LLM Integration:** Gemini API, ModelScope (Qwen)
+*   **Audio Synthesis:** GPT-SoVITS (PyTorch)
+*   **Process Management:** Python `multiprocessing` with threading Locks
 
-```text
-.
-├── Live2DChat_GSV_LLM_Service/
-│   └── GPT_SoVITS/             # Main Backend Source Code
-│       ├── fastapi_main.py     # Entry point, API Routes
-│       ├── audio_api_service.py # Audio synthesis logic router
-│       ├── text_api_service.py # LLM integration logic
-│       ├── gptsovits_process_manager.py # Multiprocessing manager for inference
-│       ├── api_character_loader.py # Character configuration loader
-│       ├── emotion_detect.py   # Emotion classification model
-│       ├── inference_webui.py  # GPT-SoVITS inference logic
-│       └── ...                 # Other configs and models
-├── Live2DChat_Vue/        # Vue.js Frontend
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── ChatInterface.vue # Chat UI & Logic
-│   │   │   └── Live2DCanvas.vue  # Live2D rendering & Motion control
-│   │   └── api/                  # Axios API wrappers
-│   └── ...
-└── Live2DChat_RVC_Service/          # RVC Microservice
-    └── rvc_api_service.py      # Independent API for RVC Voice Conversion
-```
+### Frontend (Vue.js) & Microservice (RVC)
+*   **Frontend:** Vue 3 (Composition API), Vite, TypeScript, PixiJS, Live2D Cubism SDK
+*   **Frontend Audio:** Web Audio API (Real-time volume analysis)
+*   **RVC Microservice:** FastAPI, Retrieval-based Voice Conversion (RVC), PyTorch
 
-## Future Roadmap: Scaling Architecture
+## Recent Update Log
 
-While the current `multiprocessing`-based design prioritizes efficiency on a single node, I plan a phased migration to cloud-native architecture to handle future increases in requests.
-
-### 1. Service Decoupling
-*   **Current:** Text processing (Gateway) and Audio Inference (Worker) run within the same Pod.
-*   **Plan:** Separate these into independent microservices.
-    *   **Gateway Service (CPU-bound):** Handles lightweight HTTP requests and LLM communication. Can be horizontally scaled cheaply based on CPU load.
-    *   **Inference Service (GPU-bound):** Handles heavy processing like GPT-SoVITS. Managed with a focus on GPU resources.
-
-### 2. Redis Message Queue Implementation
-*   **Current:** Uses Python's standard `multiprocessing.Queue` (communication within a single server).
-*   **Plan:** Replace inter-process communication with asynchronous messaging via **Redis**. This enables load balancing across multiple inference nodes and facilitates retries and persistence during failures.
-
-### 3. Kubernetes Model Residency & Zero Cold Start Strategy
-Simple load balancing causes delays due to loading/unloading different character models for each request. To solve this:
-*   **Character-Specific Queues:**
-    *   The Gateway distributes tasks to specific Redis lists like `queue:sakiko`, `queue:anon` based on Character ID.
-*   **Worker Specialization:**
-    *   Specific Worker Pods subscribe only to specific queues and keep the model resident in memory. This achieves **zero model switching cost** and maximizes responsiveness.
-
-### 4. Cost Optimization (FinOps)
-*   **Spot Instances:**
-    *   Use On-Demand instances for baseline nodes that run constantly, and migrate to a configuration that auto-scales (using KEDA) with cheaper **Spot Instances** (AWS/GCP) for burst traffic.
-*   **GPU Sharing:**
-    *   Utilize NVIDIA Time-Slicing to run multiple inference Pods within a single GPU node, maximizing hardware resource efficiency.
+*   **Service Decoupling:** Split the API Gateway and GSV Worker into separate repositories and processes.
+*   **Redis Message Queue Integration:** Introduced Redis to handle high-load traffic safely. This lays the groundwork for a future "Zero Cold Start" architecture.
+*   **Optimized Emotion Detection:** Removed the heavy, locally-hosted NLP emotion detection model (e.g., BERT). Instead, we now use LLM prompt engineering to output emotion tags (e.g., `[emotion:happiness]`) inside the text generation, saving VRAM and compute resources.
 
 ## Note on Setup & Execution
 
-This repository is published as a portfolio, primarily for the purpose of viewing source code.
-Operation immediately after `git clone` is not guaranteed for the following reasons:
-
-1.  **Copyright Protection:** Commercial or copyrighted Live2D model data and specific audio assets are not included in the repository.
-2.  **File Size Limits:** Large binary files such as pre-trained models (weights) for GPT-SoVITS and RVC are excluded via `.gitignore`.
+This repository is published as a portfolio primarily for viewing source code. Copyrighted Live2D model data and large pre-trained weight files are excluded via `.gitignore`.
 
 ### Missing Files Structure
-To run locally, you need to place appropriate model files and assets including (but not limited to) the following:
+To run locally, you must place appropriate files in the repository, such as:
+*   `./GPT_SoVITS/pretrained_models/` ... Pre-trained base models for GPT-SoVITS.
+*   `./reference_audio/` ... Inference audio references and model data for each character.
+*   `./public/models/` ... Live2D model data for the frontend.
 
-*   `Chat_backend/GPT_SoVITS/pretrained_models/` ... GPT-SoVITS models
-*   `Chat_backend/reference_audio/` ... Reference audio files
-*   `pixi-live2d-display/public/models/` ... Live2D model data
